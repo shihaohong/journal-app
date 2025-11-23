@@ -4,11 +4,21 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:cf": "bun run build:cf && wrangler pages dev .vercel/output/static --d1=DB=journal-db --r2=STORAGE=journal-storage",
+    "dev:cf:local": "bun run build:cf && wrangler pages dev .vercel/output/static --d1=DB=journal-db --r2=STORAGE=journal-storage --persist-to=.wrangler/state",
     "build": "next build",
     "build:cf": "next build && npx @cloudflare/next-on-pages@latest",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "npm run build:cf && wrangler pages deploy .vercel/output/static"
+    "deploy": "bun run build:cf && wrangler pages deploy .vercel/output/static",
+    "deploy:preview": "bun run build:cf && wrangler pages deploy .vercel/output/static --branch=preview",
+    "deploy:list": "wrangler pages deployment list",
+    "deploy:logs": "wrangler pages deployment tail",
+    "db:local:init": "wrangler d1 execute journal-db --local --file=./schema.sql",
+    "db:remote:init": "wrangler d1 execute journal-db --remote --file=./schema.sql",
+    "db:local:query": "wrangler d1 execute journal-db --local --command",
+    "db:remote:query": "wrangler d1 execute journal-db --remote --command",
+    "db:remote:list": "wrangler d1 execute journal-db --remote --command=\"SELECT * FROM posts ORDER BY created_at DESC LIMIT 10;\""
   },
   "dependencies": {
     "react": "^18.3.1",

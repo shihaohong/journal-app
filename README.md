@@ -55,6 +55,77 @@ bun run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
+## Local Development with Cloudflare Services
+
+By default, `bun run dev` uses in-memory storage for faster iteration. To test against Cloudflare D1 and R2 services locally:
+
+### Option 1: Test with Local D1 Database (Recommended for Development)
+
+**Note:** `wrangler pages dev` only supports **local** D1 databases, not remote ones. This is a limitation of the tool.
+
+```bash
+# First, ensure you're logged in to Cloudflare
+wrangler login
+
+# Initialize local D1 database (first time only)
+bun run db:local:init
+
+# Run with local D1 and remote R2
+bun run dev:cf
+```
+
+This will:
+- Build your Next.js app for Cloudflare Pages
+- Start a local server that connects to your **local** D1 database and **remote** R2 bucket
+- Allow you to test locally before deploying
+
+**Important:**
+- Local D1 is stored in `.wrangler/state/v3/d1/`
+- R2 will still use your remote bucket (R2 doesn't have a local mode)
+- To test with remote D1, you need to deploy to Cloudflare Pages
+
+### Option 2: Test with Remote D1 (Deploy to Cloudflare Pages)
+
+To test against your **remote** D1 database, you need to deploy to Cloudflare Pages:
+
+```bash
+# Deploy to Cloudflare Pages (uses remote D1 and R2)
+bun run deploy
+```
+
+Or create a preview deployment:
+
+```bash
+# Build for Cloudflare
+bun run build:cf
+
+# Deploy to preview
+wrangler pages deploy .vercel/output/static
+```
+
+**Note:** `wrangler pages dev` cannot connect to remote D1 databases - this is a limitation of the tool. Use local D1 for development, and deploy to test with remote D1.
+
+### Database Management
+
+Query your databases:
+
+```bash
+# Query local D1 database
+bun run db:local:query "SELECT * FROM posts"
+
+# Query remote D1 database
+bun run db:remote:query "SELECT * FROM posts"
+```
+
+### Quick Reference
+
+- `bun run dev` - Standard Next.js dev server (in-memory storage)
+- `bun run dev:cf` - Cloudflare Pages dev server with **local** D1 and **remote** R2
+- `bun run dev:cf:local` - Same as `dev:cf` (uses local persistence)
+- `bun run deploy` - Deploy to Cloudflare Pages (uses **remote** D1 and R2)
+
+**Important:** `wrangler pages dev` only supports local D1 databases. To test with remote D1, deploy to Cloudflare Pages.
+
 ## Cloudflare Deployment
 
 This app is configured to work with Cloudflare Pages with D1 database and R2 storage.
@@ -100,6 +171,8 @@ For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 For complete deployment guide with troubleshooting, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 
+**To deploy and test with remote D1 database**, see [DEPLOY_REMOTE.md](./DEPLOY_REMOTE.md) for a step-by-step guide.
+
 ## Project Structure
 
 - `/app` - Next.js app directory
@@ -115,6 +188,7 @@ For complete deployment guide with troubleshooting, see [DEPLOYMENT.md](./DEPLOY
 - The write page requires authentication via password
 - Posts are stored in Cloudflare D1 database
 - Images are stored in Cloudflare R2
-- The app currently uses in-memory storage for local development
+- By default, `bun run dev` uses in-memory storage for faster iteration
+- Use `bun run dev:cf` or `bun run dev:cf:local` to test with actual Cloudflare services
 
 

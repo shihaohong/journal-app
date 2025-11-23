@@ -45,11 +45,21 @@ function getCloudflareRuntime(request?: NextRequest): { DB?: D1Database; STORAGE
   // @ts-ignore
   const cfRuntime = typeof globalThis !== 'undefined' ? (globalThis as any).__CF_RUNTIME : null
 
+  // Try accessing through request context (for wrangler pages dev)
+  // @ts-ignore
+  const requestEnv = request ? (request as any).env || (request as any).cf?.env : null
+
   // Access bindings - try multiple locations
   // @ts-ignore
   let db = env.DB || null
   // @ts-ignore
   let storage = env.STORAGE || null
+
+  // Try request context first (for wrangler pages dev)
+  if (requestEnv) {
+    if (!db && requestEnv.DB) db = requestEnv.DB
+    if (!storage && requestEnv.STORAGE) storage = requestEnv.STORAGE
+  }
 
   // Try globalThis.ENV if process.env didn't have them
   if (!db && globalEnv?.DB) {
@@ -117,12 +127,27 @@ export async function GET(request: NextRequest) {
 
     if (runtime?.DB) {
       console.log("✓ Using D1 database")
-      // Use Cloudflare D1 in production
-      const result = await runtime.DB.prepare(
-        "SELECT * FROM posts ORDER BY created_at DESC"
-      ).all()
-      console.log("✓ D1 query successful, returning", result.results?.length || 0, "posts")
-      return NextResponse.json(result.results || [])
+      try {
+        // Use Cloudflare D1 in production
+        const result = await runtime.DB.prepare(
+          "SELECT * FROM posts ORDER BY created_at DESC"
+        ).all()
+        console.log("✓ D1 query successful, returning", result.results?.length || 0, "posts")
+        return NextResponse.json(result.results || [])
+      } catch (dbError: any) {
+        console.error("D1 database error:", dbError)
+        console.error("Error details:", {
+          message: dbError?.message,
+          cause: dbError?.cause,
+          stack: dbError?.stack
+        })
+        // If it's a table doesn't exist error, return empty array
+        if (dbError?.message?.includes("no such table") || dbError?.message?.includes("does not exist")) {
+          console.log("⚠ Posts table doesn't exist yet, returning empty array")
+          return NextResponse.json([])
+        }
+        throw dbError
+      }
     }
 
     // Fallback to in-memory for local development
@@ -133,10 +158,19 @@ export async function GET(request: NextRequest) {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
     return NextResponse.json(sortedPosts)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching posts:", error)
+    console.error("Error details:", {
+      message: error?.message,
+      cause: error?.cause,
+      stack: error?.stack,
+      name: error?.name
+    })
     return NextResponse.json(
-      { error: "Failed to fetch posts" },
+      {
+        error: "Failed to fetch posts",
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      },
       { status: 500 }
     )
   }
@@ -182,12 +216,12 @@ export async function POST(request: NextRequest) {
         await runtime.STORAGE.put(fileName, bytes, {
           httpMetadata: { contentType: imageFile.type }
         })
-        // Note: You'll need to configure R2 public access or use a custom domain
-        // For now, we'll use a placeholder - update with your R2 public URL or custom domain
-        imageUrl = `https://pub-<your-account-id>.r2.dev/${fileName}`
-        // Or if you have a custom domain:
-        // imageUrl = `https://your-custom-domain.com/${fileName}`
+        // Use our API route to serve the image
+        // This works both locally and in production
+        const baseUrl = request.nextUrl.origin
+        imageUrl = `${baseUrl}/api/images/${fileName}`
         console.log("✓ Image uploaded to R2:", fileName)
+        console.log("✓ Image URL:", imageUrl)
       } else {
         console.log("⚠ Using data URL for image (R2 not available)")
         // For local development, create a data URL
@@ -199,17 +233,37 @@ export async function POST(request: NextRequest) {
 
     if (runtime?.DB) {
       console.log("✓ Using D1 database for post creation")
-      // Use Cloudflare D1 in production
-      const result = await runtime.DB.prepare(
-        "INSERT INTO posts (title, content, image_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING *"
-      ).bind(title, content, imageUrl, now, now).first()
+      try {
+        // Use Cloudflare D1 in production
+        // D1/SQLite doesn't support RETURNING, so we insert and then select
+        const insertResult = await runtime.DB.prepare(
+          "INSERT INTO posts (title, content, image_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+        ).bind(title, content, imageUrl, now, now).run()
 
-      if (!result) {
-        throw new Error("Failed to create post in database")
+        if (!insertResult.success) {
+          throw new Error("Failed to insert post into database")
+        }
+
+        // Get the inserted row using last_insert_rowid()
+        const result = await runtime.DB.prepare(
+          "SELECT * FROM posts WHERE id = ?"
+        ).bind(insertResult.meta.last_row_id).first()
+
+        if (!result) {
+          throw new Error("Failed to retrieve created post from database")
+        }
+
+        console.log("✓ Post created in D1:", result)
+        return NextResponse.json(result, { status: 201 })
+      } catch (dbError: any) {
+        console.error("D1 database error:", dbError)
+        console.error("Error details:", {
+          message: dbError?.message,
+          cause: dbError?.cause,
+          stack: dbError?.stack
+        })
+        throw dbError
       }
-
-      console.log("✓ Post created in D1:", result)
-      return NextResponse.json(result, { status: 201 })
     }
 
     // Fallback to in-memory for local development
@@ -230,10 +284,19 @@ export async function POST(request: NextRequest) {
     console.log("Total posts:", globalThis.__posts!.length)
 
     return NextResponse.json(newPost, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating post:", error)
+    console.error("Error details:", {
+      message: error?.message,
+      cause: error?.cause,
+      stack: error?.stack,
+      name: error?.name
+    })
     return NextResponse.json(
-      { error: "Failed to create post" },
+      {
+        error: "Failed to create post",
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      },
       { status: 500 }
     )
   }
