@@ -18,7 +18,11 @@
     "db:remote:init": "wrangler d1 execute journal-db --remote --file=./schema.sql",
     "db:local:query": "wrangler d1 execute journal-db --local --command",
     "db:remote:query": "wrangler d1 execute journal-db --remote --command",
-    "db:remote:list": "wrangler d1 execute journal-db --remote --command=\"SELECT * FROM posts ORDER BY created_at DESC LIMIT 10;\""
+    "db:remote:list": "wrangler d1 execute journal-db --remote --command=\"SELECT * FROM posts ORDER BY created_at DESC LIMIT 10;\"",
+    "db:clear:remote": "bun scripts/clear-posts.ts --remote --confirm",
+    "db:clear:local": "bun scripts/clear-posts.ts --local --confirm",
+    "db:clear:remote:dry": "bun scripts/clear-posts.ts --remote --dry-run",
+    "db:clear:local:dry": "bun scripts/clear-posts.ts --local --dry-run"
   },
   "dependencies": {
     "react": "^18.3.1",
