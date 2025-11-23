@@ -36,7 +36,7 @@ yarn-error.log*
 
 # Optional: Uncomment the line below if you want to keep your actual wrangler.toml private
 # (You can commit wrangler.toml.example instead)
-# wrangler.toml
+wrangler.toml
 
 # typescript
 *.tsbuildinfo
