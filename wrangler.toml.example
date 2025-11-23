@@ -1,0 +1,35 @@
+# Example wrangler.toml configuration
+# Copy this file to wrangler.toml and replace the placeholder values with your actual values
+
+name = "journal-app"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat_v2"]
+pages_build_output_dir = ".vercel/output/static"
+
+# D1 Database binding - applies to all environments
+# To get your database_id, run: wrangler d1 create journal-db
+[[d1_databases]]
+binding = "DB"
+database_name = "journal-db"
+database_id = "YOUR_DATABASE_ID_HERE"  # Replace with your actual database ID
+
+# R2 Bucket binding - applies to all environments
+# To create your bucket, run: wrangler r2 bucket create journal-storage
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "journal-storage"
+
+[env.production]
+compatibility_flags = ["nodejs_compat_v2"]
+
+# D1 Database binding for production
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "journal-db"
+database_id = "YOUR_DATABASE_ID_HERE"  # Replace with your actual database ID
+
+# R2 Bucket binding for production
+[[env.production.r2_buckets]]
+binding = "STORAGE"
+bucket_name = "journal-storage"
+
